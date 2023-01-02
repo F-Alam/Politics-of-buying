@@ -1,0 +1,146 @@
+---
+title: "W204 Final Project"
+subtitle: "Effect of Political Ideology on Consumer Purchasing Behavior"
+author: "Jun Cao, Susmita Padala, Ferdous Alam"
+date: \today
+bibliography: citation/citation.bib
+csl: citation/nature.csl
+output:
+  pdf_document: 
+    toc: true
+    number_sections: true
+    toc_depth: 2
+---
+
+```{r load packages, warning=FALSE, message = FALSE, include = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, 
+  warning = FALSE,
+  message = FALSE,
+  out.width = "70%", 
+  fig.align = "center")
+
+library(data.table)
+
+library(sandwich)
+library(lmtest)
+library(AER)
+
+library(stargazer)
+library(ggplot2)
+library(magrittr)
+library(gridExtra)
+library(GGally)
+
+library(knitr)
+```
+
+\newpage
+
+# Abstract
+
+Political ideology seems to play an important role in consumer behavior. While most of the recent studies related to the intersection of political ideology and consumer behavior stems from analyzing survey and opinion data, we wanted to test the theory and see whether political attitudes translated to actual purchase and spending decisions exhibited by the consumers. 
+The results of our experiment suggest that purchasing decisions (i.e. whether they choose to buy a product or not ) is influenced by consumer’s political ideology; however we did not find any meaningful indication in the price they are willing to pay once the decision to purchase was made.
+
+# Background
+
+Recent surveys[@James2020], have demonstrated a societal shift about what is and is not acceptable for companies to endorse. It is posited that; the political identity plays a critical role in consumer decisions even when the decision may be seemingly unrelated to politics[@Political]. The reasons for this likely stem from the notion that identity-congruent consumption helps an individual preserve the self by signaling to the self and to others about the importance of the identity[@Bern2011].
+
+# Research Question and Hypothesis
+
+Is political attitude has any effect on consumer purchasing decisions? We extend on this notion of self-preserving identity, that is, if you adhere conservative ideology whether it would present itself in the consumer behavior[@Laura2020]. In a recent survey conducted by Pew Research center, 83% of Republicans and those who lean to the Republican Party, say they have an unfavorable view of China. While we understand that it is difficult to isolate consumers into specific political buckets, there could be generalized that specific product like, “Trump 2024 Flags” will exclusively be bought by consumers who are right leaning or republicans
+
+**Null Hypothesis:** There is no difference at number of sales and price between control and treatment groups in average. 
+
+# Experiment Design
+
+## Experiment Overview
+
+To test our hypothesis we set up an experiment selling Donald Trump 2024 election flags. In the experiment, the flags in control and treatment groups were identical. The item pages in control did not specify a manufacturing country and the item pages in treatment specified the flags were made in China on the item title.
+
+We had 3 types of Trump flags (see appendix for flags images):
+
+  * Type 1: Trump Take America Back 2024 (Blue)
+  
+  * Type 2: Trump Save America 2024 (Blue)
+  
+  * Type 3: Trump Save America 2024 (Red)
+
+All flags were 5ft by 3ft in dimension. 
+
+We combined type 1 and type 2 flags as blue class to setup a 2x2 multi-factorial design due to insufficient sample size:
+
+  * Blue Class: Trump Take America Back 2024 (Blue) + Trump Save America 2024 (Blue)
+  
+  * Red Class: Trump Save America 2024 (Red)
+	
+Each flag then had 2 auction duration possibilities: 1 day or 3 days. All auctions had a starting price of $2.99.
+
+The experiment is conducted as a series of auctions on eBay. We always made sure to list two flags (of the same type) at any given time, one for control and one for treatment (made in China). After the auction ended, we launched a new set of auction pages. We measure if a flag sold, what price it sold for, and how many views the auction page received.
+
+
+## Project Timeline
+
+![Time Line](imgs/timeline.png)
+
+The data collection process took 6 weeks to complete. Listing auction pages in sequence was a time consuming process.
+
+## Experiment Platform
+
+For our experiment, we used eBay as the selling platform to sell our treatment and control items. We considered other platforms such as Facebook Marketplace, Etsy, and Craigslit. The reason we chose to use eBay was because eBay had a convenient auction platform. Also unlike a platform like Craigslist, eBay was not limiting listings by geography. Etsy was also a platform we spent a lot of time considering but ultimately, the cost of the flags on Etsy and it’s reputation as a more high-end “hippie liberal” salesplace did not align with the group of participants that would buy our flags (i.e. Trump supporters).
+
+On eBay, there are various selling options. We can have an auction, we can simply list the item, or we can set a price at which the item will be sold immediately if someone offers to pay. We chose to hold an auction because by directly listing an item, we would not have the opportunity to see the range of prices that customers are willing to pay. And if we had chosen to set a “buy price” then we would be capping what customers are willing to spend. Therefore, auctions seemed to be the best methodology for our experiment.
+
+As we started running our experiment, we discovered various limitations of the eBay platform we were not aware of. For example, the one day auction duration is only available to existing sellers who had already made sales on eBay. Also, one user cannot post the same item for an auction for two different durations. Similarly, one of our researchers did not have an eBay account so whenever they created an eBay account to sell Trump flags, they would be reported and the account was suspended. These were both hurdles we did not expect but we still managed to complete our experiment; albeit not as well planned as before.
+
+## Randomization
+
+Our randomization was based on the fact we were selling on a publicly available marketplace such as eBay. However, we were limited by the eBay algorithm and cannot speak much for how that algorithm recommends items to potential buyers. We ensured that we listed both the control and treatment at the same time.
+
+## Pilot Test
+
+The pilot test was extremely helpful to understand the roadblocks that was not anticipated. Initially, we had auction duration to be 3 days and 5 days. In our pilot test, we found out that eBay considered two item pages, which only differs in duration, to be the same item. eBay would only make one of the two to be visible to buyers, which means running 5 days auction in sequence would take too long. We also ran into a situation that eBay terminated all new accounts we created to run the experiments. We could only use two personal accounts that we had used in many years. Therefore we decided to change 5 days to 1 day auction in order to have enough sample size. 
+
+The pilot test also helped determine that an optimal price point for Trump flags was $2.99. We did not want to price the flags too high (so they wouldn’t sell) or two low (that they would always sell). Some of the pilot data was also used in our analysis.
+
+## Observations and Outcome Measures
+
+The main observations that we measured were
+
+  * Did a flag sell? (sold indicator)
+  
+  * What was the highest bid price?
+  
+  * How many views did each flag listing get?
+
+Out of the above measures, we decided to use the sold indicator as the primary outcome measurement and price as the secondary measurement. Through data exploration, we realized the 1 day auctions had a big impact on the price measurement, therefore the sold indicator was a more desirable outcome to use. Details were shown in the data exploration section. 
+
+The page views was highly influenced by the algorithm, therefore we decided to not use it for inference. 
+
+```{r data and analysis, child='sections/analysis.Rmd'}
+```
+
+# Conclusions
+
+As we observed in the analysis section, both tests were statistically significant. Therefore we rejected the null hypothesis. Considering the small sample size, the causal effect was quite strong.
+
+The experiment we conducted provided a starting framework to pave the way for further research into the area of political ideology playing a role in the consumer decision making process. The study indicated that aggregate demand for a product was less, i.e. consumers would be buying less of the product if they have certain characteristics which are not aligned with their political ideology. 
+
+The analysis of price showed significance too, but it might be because there were simply more unsold items in the treatment group. In order to have a concrete result on the treatment effect on price, it might be more desirable to re-run the experiment with longer auction duration. 
+
+# Limitations and Future Enhancements
+
+There are several limitations to the study that would possibly be detrimental if we were to infer a generalized causal relationship that we are investigating.
+
+To start with we have only looked at one side of the political spectrum and a similar effect may or may not exist on the other side of the aisle (left leaning). Khan et al. (2013) show that conservatives prefer national over generic brands due to aversion to risk and ambiguity[@Khan2013]. In addition, the causal relationship of the treatment effect may only be applicable to a narrow set of the population with only very strong political conviction. This could be mitigated or improved by running experiments that measure not only both sides of the political spectrum but also with consumers who do not have any political tilt.
+
+Given we have used only one product (albeit slight variation in the product characteristic) it might only be applicable to only certain types of product. In addition, we did not have any significant measure of the price elasticity of the product itself and conducted the experiment using a relatively cheap product which also may not be present or applicable when they are priced higher. Hence this limitation would be better conducted by using a wider range of price-product combinations.
+
+There were also some limitations based on the platform of choice eBay. Although we listed both the control and treatment at the same time, we did not have any insight into ebay’s algorithm in terms of how they assign visibility of the listing ( i.e. control and treatment ). While it is not a stretch to assume the algorithm is unbiased, however we do not have clarity of the process. In addition eBay allows the consumer to see ‘other products listed by the ‘same seller’. This might have caused unintended consequences if the buyer became aware of the similarity in the product by the same seller (us) and behaved differently based on the understanding that we are running an experiment. These constraints can be mitigated by using multiple channels ( other selling platforms ) and creating multiple seller accounts to account for any interference that might be inherent in the platform itself.
+
+\newpage
+
+# Appendix
+
+```{r appendix, child='sections/appendix.Rmd'}
+```

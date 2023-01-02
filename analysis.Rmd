@@ -1,0 +1,301 @@
+# Data Exploration
+
+```{r, include=FALSE}
+# data preparation
+# item sales data
+dt_items_raw <- data.table(read.csv('../data/items.csv'))
+dt_items_raw <- dt_items_raw[ , .(item_number,page_view,sold_within_duration,duration,treatment,flag_type)]
+# bids data 
+dt_bids_raw <- data.table(read.csv('../data/bids.csv'))
+dt_bids_raw <- dt_bids_raw[!is.na(item_number), .(item_number, customer_id, offer)]
+
+# create main data set by joining item with highest bid
+dt_bids <- 
+  dt_bids_raw[ , .(num_bids = .N, highest_bid = max(offer)), key = item_number]
+d <- merge(dt_items_raw, dt_bids, by = 'item_number', all.x = T)
+# replace NA with 0 in num_bids
+d[ , num_bids := ifelse(is.na(num_bids), 0, num_bids)]
+# rename column
+colnames(d)[3] <- "sold"
+d[is.na(highest_bid), highest_bid := 0]
+d[ , flag_type := factor(flag_type)]
+
+# create another data set for bidders 
+d_bids <- merge(dt_items_raw, dt_bids_raw, by = "item_number", all.y = T)
+```
+
+
+```{r, results='hide'}
+d
+d_bids
+```
+
+```{r, results='hide'}
+# sanity check
+d[sold == 1 & highest_bid == 0]
+tot_items <- d[ , .N]
+tot_items == d[ , .(unique(item_number))][, .N]
+```
+
+For each item listed, we collected page views, number of bids, sale price and every bids received. In this section we want to gain some overall understanding of this experiment from the data we collected. 
+
+## Items Data
+
+```{r, include=FALSE}
+tot_items <- d[ , .N]
+tot_sold <- d[sold==1, .N]
+tot_unsold <- d[sold==0, .N]
+p_unsold <- tot_unsold/tot_sold
+```
+
+We listed total of `r tot_items` auctions, in which half is in treatment group with "Made In China" listed on the title. Total of `r tot_unsold` items didn't receive any bid, which accounts for `r sprintf('%.0f', p_unsold*100)`% of total items listed. Treatment group has more unsold items than control group. Detailed numbers are summarized in the table below.
+
+```{r number table}
+table1 <- d[ , .("Number of Unsold" = .N - sum(sold),  "Number of Sold" = sum(sold), "Percent Unsold (%)" = (.N - sum(sold)) / .N * 100, "Number of Listed" = .N), by = treatment]
+table1 <- table1[ , .("Group" = ifelse(treatment == 1, "Treatment", "Control"), `Number of Unsold`, `Number of Listed`, `Percent Unsold (%)`)]
+kable(table1, caption = "Number of Items in Groups")
+```
+
+### Sold Indicator Outcome Variable
+
+```{r, include=FALSE}
+num_unsold_control <- tot_items/2 - d[treatment == 0 & sold == 0, .N]
+num_unsold_treatment <- tot_items/2 - d[treatment == 1 & sold == 0, .N]
+perc_unsold_control <- num_unsold_control / tot_items / 2
+perc_unsold_treatment <- num_unsold_treatment / tot_items / 2
+```
+
+The primary outcome variable we focused on is the sold indicator. Control group has `r num_unsold_control` unsold items, which accounts for `r sprintf("%.1f", perc_unsold_control*100)`%, and treatment group has `r num_unsold_treatment` unsold items, which accounts for `r sprintf("%.1f", perc_unsold_treatment*100)`%. The treatment effectively decreased sales by `r sprintf("%0.1f", perc_unsold_control*100 - perc_unsold_treatment*100)`% when comparing the two groups. 
+
+```{r, out.width="50%"}
+sold_treatment_plot <-
+  d[ , .(count = .N), key=.(treatment, sold)] %>%
+  ggplot() + 
+  aes(fill=factor(sold, labels=c("Unsold", "Sold")), y=count, x=factor(treatment, labels=c("Control", "Treatment"))) + 
+  geom_bar(position="stack", stat="identity") + 
+  labs(
+    title = 'Control and Treatment Group Comparison', 
+    subtitle = 'Treatment group has less items sold',
+    y = '',
+    x = '',
+    fill = ' '
+  ) 
+sold_treatment_plot
+```
+
+```{r, include=FALSE}
+num_flag1 <- d[flag_type==1, .N]
+num_flag2 <- d[flag_type==2, .N]
+num_flag3 <- d[flag_type==3, .N]
+perc_unsold_1day <- d[duration==1 & sold==0, .N] / d[duration==1, .N]
+perc_unsold_3day <- d[duration==3 & sold==0, .N] / d[duration==3, .N]
+```
+
+We used 3 types of flags in this experiment. Type 1, type 2 and type 3 was listed `r num_flag1`, `r num_flag2` and `r num_flag3` times respectively. Type 1 flag didn't have enough sample size, therefore in the analysis we combine type 1 and type 2 flags together for factorial design. As illustrated below, flag types didn't seem to be a factor to affect sales. 
+
+We designed the experiment to be 1 day and 3 days auctions. During the process of the experimentation, we started to realize 1 day auction might be harder to sell compare to 3 days auctions. Therefore we intentionally launched more 3 days auction. The plot below showed that `r sprintf("%.1f", perc_unsold_1day*100)`% unsold in 1 day auction and `r sprintf("%.1f", perc_unsold_3day*100)`% unsold in 3 days auction. 
+
+```{r duration count plot}
+sold_flag_plot <-
+  d[ , .(count = .N), key=.(flag_type, sold)] %>%
+  ggplot() + 
+  aes(fill=factor(sold, labels=c("Unsold", "Sold")), y=count, x=factor(flag_type, labels=c("Type 1", "Type 2", "Type 3"))) + 
+  geom_bar(position="stack", stat="identity") + 
+  labs(
+    title = 'Flag Type Comparison', 
+    subtitle = 'More type 3 flags',
+    y = 'Count',
+    x = 'Flag Type',
+    fill = ' '
+  ) + 
+  theme(legend.position = c(0.18, 0.82))
+
+sold_duration_plot <- 
+  d[ , .(count = .N), key=.(duration, sold)] %>%
+  ggplot() + 
+  aes(fill=factor(sold, labels=c("Unsold", "Sold")), y=count, x=factor(duration, labels=c("1 day", "3 days", "7 days"))) +
+  geom_bar(position="stack", stat="identity") + 
+  labs(
+    title = 'Auction Duration Comparison', 
+    subtitle = 'Listed more 3 days than 1 day auction',
+    y = 'Count',
+    x = 'Auction Duration',
+    fill = ' '
+    ) + 
+  theme(legend.position = "none")
+  
+  
+sold_duration_perc_plot <-
+  d[ , .(count = .N), key=.(duration, sold)] %>%
+    ggplot() + 
+    aes(fill=factor(sold, labels=c("Unsold", "Sold")), y=count, x=factor(duration, labels=c("1 day", "3 days", "7 days"))) + 
+    geom_bar(position="fill", stat="identity") + 
+    labs(
+      title = 'Percent of Unsold Items', 
+      subtitle = '1 day auction has more unsold',
+      y = 'Percent',
+      x = 'Auction Duration',
+      fill = ''
+    ) + 
+  theme(legend.position = "none")
+
+lay <- rbind(c(1, 2), 
+             c(1, 3))
+
+grid.arrange(sold_flag_plot, sold_duration_plot, sold_duration_perc_plot, layout_matrix = lay)
+```
+
+### Sale Price
+
+```{r, include=FALSE}
+sold_mean <- d[sold == 1, mean(highest_bid)]
+sold_std <- d[sold == 1, sqrt(var(highest_bid))]
+control_mean <- d[treatment == 0 & sold == 1, mean(highest_bid)]
+treatment_mean <- d[treatment == 1 & sold == 1, mean(highest_bid)]
+control_std <- d[treatment == 0 & sold == 1, sqrt(var(highest_bid))]
+treatment_std <- d[treatment == 1 & sold == 1, sqrt(var(highest_bid))]
+```
+
+The secondary outcome variable we were interested was sale price. Among all the sold items, the mean of sale price is `r sprintf('%.2f', sold_mean)` dollars and the standard deviation is `r sprintf('%.2f', sold_std)`. The price distribution is right skewed with majority of sale price at around 3 dollars. Considering auctions started at $2.99, it means most items were sold without much bidding competition. By looking at the plot of 1 day auction price, we observed that most of the items sold around starting price came from the 1 day auction. In fact, the price in 1 day auctions had much smaller variation when compare to 3 days auction. Therefore we concluded that the 1 day auction doesn't provide as clean measurement on price. 
+
+```{r price boxplot, out.width="85%"}
+price_comp_plot <- 
+  d[highest_bid != 0, ] %>%
+    ggplot() + 
+    aes(highest_bid, factor(treatment, labels=c("Control", "Treatment"))) + 
+    geom_boxplot(outlier.shape = NA, varwidth = TRUE) + 
+    geom_jitter(width = 0.2) + 
+    labs(
+      title = "Compare Durations",
+      subtitle = 'Treatment group sold at lower price',
+      x = 'Sale Price', 
+      y = ' '
+    ) + 
+  scale_y_discrete(guide = guide_axis(angle = 90))
+
+price_duration_plot <-
+    d[highest_bid != 0, ] %>%
+    ggplot() + 
+    aes(highest_bid, factor(factor(duration), labels=c("1 day", "3 days", "7 days"))) + 
+    geom_boxplot(outlier.shape = NA, varwidth = TRUE) + 
+    geom_jitter(width = 0.2) + 
+    labs(
+      title = "Compare Treatment and Control", 
+      subtitle = '1 day auction price has less variation',
+      x = 'Sale Price', 
+      y = ' '
+    ) +
+  scale_y_discrete(guide = guide_axis(angle = 90))
+
+price_hist <-
+  d[highest_bid != 0, ] %>%
+    ggplot() + 
+    aes(highest_bid) + 
+    geom_histogram(bins = 8) + 
+    labs(
+      title = "Price Distribution",
+      subtitle = 'Not normally distributed. Many sold at starting price.',
+      x = 'Sale Price',
+      y = ''
+    )
+
+lay <- rbind(c(1, 1), 
+             c(2, 3))
+grid.arrange(price_hist, price_comp_plot, price_duration_plot, layout_matrix = lay)
+```
+
+Other measurements we collected, including number of bids and page views, were highly correlated with sale price. The covariance matrix plot of these measurements could be found in the appendix.
+
+## Bidders Data
+
+```{r bidders, include=FALSE}
+win_select <- d_bids[ , .(offer == max(offer)), by=item_number]$V1
+d_winners <- d_bids[win_select, ]
+
+num_bids <- d_bids[ , .N]
+num_bidders <- d_bids[ , .(custormer_id = unique(customer_id))][ , .N]
+num_uniq_winners <- d_winners[ , .(unique(customer_id))][, .N]
+num_mul_purchase <- d_winners[ , .N, key=customer_id][N >= 2, .N]
+num_ct_purchase <- sum(d_winners[treatment == 0, unique(customer_id)] %in% d_winners[treatment == 1, unique(customer_id)])
+```
+
+
+In this experiment, we had received total of `r num_bids` bids from `r num_bidders` bidders. There were `r num_uniq_winners` people winning `r tot_sold` sold items.   
+
+As illustrated below, most of items were purchased by different people. There were `r num_mul_purchase` people who bought flags more than once and they also purchased both control and treatment. This is a desirable result, because if few people made up most of the purchases, the experiment would be highly biased to reflect the choice of those people. The 6 weeks of data collecting process helped to minimize the amount of active buyers. If we had ran the experiment in a short period time, someone who had large demand at the time might keep purchasing our product, because the price we listed was significantly lower than other sellers.
+
+```{r, out.width="50%"}
+winner_plot <-
+  d_winners[ , .N, key=customer_id] %>%
+  ggplot() + 
+  aes(x = N) + 
+  geom_histogram(bins = 4) + 
+  labs(
+    title = 'Auction Winner Distribution',
+    subtitle = 'Majority of items are purchased by different people', 
+    x = 'Number of Purchases', 
+    y = ''
+  )
+winner_plot
+```
+
+# Analysis
+
+## Regress Sold on Treatment
+
+We used sold indicator as outcome variable to perform three regressions as shown below. We used only treatment in first regression and duration and flag type as covariates in second regression. The third regression added interaction term of treatment and flag types. 
+
+```{r regress sold on treatment, include=FALSE}
+
+rse <-function(model) {
+  v_cov = vcovHC(model, type = "HC3")
+  rse   = sqrt(diag(v_cov))
+  return(rse)
+}
+
+d[ , flag_regroup := ifelse(flag_type %in% c(0, 1), 'type1and2', 'type3')]
+
+mod_sold1 <- d[ , lm(sold ~ treatment)]
+mod_sold2 <- d[ , lm(sold ~ treatment + duration + flag_regroup)]
+mod_sold3 <- d[ , lm(sold ~ treatment + duration + flag_regroup + treatment:flag_regroup)]
+
+mod_sold1$rse <- rse(mod_sold1)
+mod_sold2$rse <- rse(mod_sold2)
+mod_sold3$rse <- rse(mod_sold3)
+```
+
+```{r reg table sold, warning=FALSE}
+stargazer(
+  mod_sold1, mod_sold2, mod_sold3, 
+  type = "text", 
+  se = list(mod_sold1$rse, mod_sold2$rse, mod_sold3$rse),
+  #no.space = TRUE,
+  dep.var.labels = c("Sold"),
+  covariate.labels = c("Treatment", "Duration", "Red Flag", "Interaction: Treatment:Red Flag", "Intercept"),
+  star.cutoffs = c(0.05, 0.01, 0.001), 
+  title = "Regression Table 1: Regress sold on treatment",
+  omit.stat = c("rsq")
+  )
+```
+
+
+The ATE was -0.246, which means by adding the "Made in China" phrase to sale page title would decrease sales by 24.6%. The robust standard error was 0.101 and the 95% confidence interval was [`r sprintf("%.3f", -0.246-1.96*0.101)`, `r sprintf("%.3f", -0.246+1.96*0.101)`]. The ATE wass statistically significant.
+
+After adding covariates, the ATE didn't change much. It verifies that launching control and treatment at the same time ensures apples-to-apples comparison. After adding the interaction term, the coefficient of 'Treatment' became the ATE of blue flags, which wass statistically insignificant. We did't observe any significant interaction effect either. The reason might be not having large enough sample size for each subgroup. Each of the four subgroup only had less than 20 subjects in average.
+
+The other thing to notice is that the adjusted $R^2$ wass very low. This indicated that there were many unobserved confounders in this experiment. In fact, eBay algorithm played an important role to determine the sales of the item. Many unobserved confounders might be related to the algorithm. 
+
+## Sale Price Analysis
+
+```{r reg table, warning=FALSE}
+price_test = d[ , wilcox.test(highest_bid ~ treatment, alternative = "two.sided")]
+```
+
+Because the sale price was not normally distributed, we used the Wilcoxon Rank Sum test for analysis. The two sided analysis had a p-value of `r price_test$p.value`, which is statistically significant. 
+
+```{r}
+price_test
+```
+
+
+

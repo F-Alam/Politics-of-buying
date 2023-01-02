@@ -1,0 +1,30 @@
+
+## Data
+```{r}
+kable(d[ , .(item_number, page_view, duration, flag_type, treatment, sold, num_bids, highest_bid)], caption = "Item Data")
+kable(dt_bids_raw, caption = "Bidders Data")
+```
+
+## Flags 
+
+Type 1
+
+![Type 1](imgs/flag1.jpg)
+
+![Type 2](imgs/flag2.jpg)
+
+![Type 3](imgs/flag3.jpg)
+
+## Other Measurements
+
+Relationship of number of bids, price, page views.
+
+```{r cov matrix plot}
+d[ , .("Number of Bids" = num_bids, Price = highest_bid, "Page Views" = page_view, Treatment = factor(treatment, labels=c("Control Group", "Treatment Group")))] %>%
+  na.omit() %>%
+  ggpairs(., 
+          mapping = ggplot2::aes(colour=Treatment), 
+          columns = 1:3, 
+          lower = list(continuous = wrap("smooth", alpha = 0.8))) +
+  theme(legend.position = "bottom")
+```
